@@ -22,6 +22,7 @@ Flow API Tool wraps that workflow into a repeatable local tool:
 - Download real Flow 2K/4K upsampled files when your account supports it.
 - Reuse reference media IDs from a local SQLite library.
 - Call the same workflow from Python scripts.
+- Run the workflow directly inside a Codex workspace.
 - Keep runtime secrets, browser state, outputs, and reference files out of git.
 
 ## What You Can Build With It
@@ -30,7 +31,24 @@ Flow API Tool wraps that workflow into a repeatable local tool:
 - Character or product reference libraries that can be reused by name.
 - Local image generation pipelines driven by Python.
 - Repeatable 2K download workflows instead of manual browser clicking.
+- Codex-assisted prompt iteration, reference upload, generation, and result inspection.
 - Creative tooling around prompt templates, shot lists, and visual iteration.
+
+## Use It Directly in Codex
+
+This repo is designed to work well inside Codex. Because the tool is just local files, PowerShell scripts, and Python commands, Codex can operate it directly in the workspace after your local Flow browser session is connected.
+
+You can ask Codex to do things like:
+
+```text
+Set up this project and check whether the Flow bridge is connected.
+Upload refs/character.png as @character_a, then generate 4 cinematic 2K images.
+Generate three product poster variants and save the response JSON.
+Use the latest response.json in outputs/ and redownload the result as 2K.
+Create a Python batch script that tests these 10 prompts with @product_a.
+```
+
+Codex can edit prompts, write batch scripts, run `flow.py`, inspect `outputs/`, and help organize reusable reference names while your private config, browser profile, logs, reference images, and generated files stay local.
 
 ## Quick Demo
 
