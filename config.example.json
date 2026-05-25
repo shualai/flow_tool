@@ -1,0 +1,8 @@
+{
+  "base_url": "http://127.0.0.1:8100",
+  "project_id": "",
+  "user_paygate_tier": "PAYGATE_TIER_ONE",
+  "aspect_ratio": "IMAGE_ASPECT_RATIO_LANDSCAPE",
+  "chrome_path": "",
+  "chrome_profile_dir": "./chrome-profile"
+}
