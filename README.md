@@ -5,11 +5,11 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](requirements.txt)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](USAGE.zh-CN.md)
 
-Local Google Flow / Nano Banana Pro automation toolkit with a CLI, Python SDK, reference-image library, and real 2K/4K download workflow.
+Local Google Flow / Nano Banana automation toolkit with a CLI, Python SDK, reference-image library, and real 2K/4K download workflow.
 
 > Unofficial local tool for personal Flow workflows. It runs on your own machine, with your own browser session. It is not a Google product.
 
-[中文使用说明](USAGE.zh-CN.md) · [Security](SECURITY.md) · [Open-source checklist](OPEN_SOURCE_CHECKLIST.md)
+[中文使用说明](USAGE.zh-CN.md)
 
 ## Why This Exists
 
@@ -27,7 +27,7 @@ Flow API Tool wraps that workflow into a repeatable local tool:
 
 ## What You Can Build With It
 
-- Batch prompt testing for Nano Banana Pro / Google Flow image workflows.
+- Batch prompt testing for Nano Banana / Google Flow image workflows.
 - Character or product reference libraries that can be reused by name.
 - Local image generation pipelines driven by Python.
 - Repeatable 2K download workflows instead of manual browser clicking.
@@ -220,19 +220,8 @@ src/flow_api.py         Python wrapper
 src/ref_store.py        Local SQLite reference library
 vendor/flowkit          Bundled FlowKit agent and extension
 config.example.json     Public config template
-export_portable.ps1     Clean export script
 USAGE.zh-CN.md          Chinese usage guide
 ```
-
-## Portable Export
-
-Use the export script instead of manually zipping a running directory:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\export_portable.ps1 -PublicRelease
-```
-
-The public release export excludes private config, browser profile, logs, outputs, local reference images, local state, and FlowKit runtime databases.
 
 ## Important Notice
 

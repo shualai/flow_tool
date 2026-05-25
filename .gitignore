@@ -16,14 +16,18 @@ logs/*
 outputs/*
 refs/*
 state/*
-!outputs/.gitkeep
-!refs/.gitkeep
-!state/.gitkeep
 
 vendor/flowkit/flow_agent.db*
 vendor/flowkit/output/
 vendor/flowkit/.venv/
-vendor/flowkit/dashboard/.omc/
+vendor/flowkit/.claude/
+vendor/flowkit/.github/
+vendor/flowkit/dashboard/
+vendor/flowkit/docs/
+vendor/flowkit/scripts/
+vendor/flowkit/skills/
+vendor/flowkit/tests/
+vendor/flowkit/tools/
 
 *.zip
 *.7z

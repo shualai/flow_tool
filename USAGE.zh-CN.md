@@ -1,6 +1,6 @@
 # Flow API Tool 中文指南
 
-Flow API Tool 是一个面向 Google Flow / Nano Banana Pro 图片工作流的本地自动化工具。它把网页里反复点击的流程，整理成可以复用、可以写脚本、可以批量生成和下载的命令行工具。
+Flow API Tool 是一个面向 Google Flow / Nano Banana 图片工作流的本地自动化工具。它把网页里反复点击的流程，整理成可以复用、可以写脚本、可以批量生成和下载的命令行工具。
 
 它不是官方 API，也不是托管服务。它运行在你的电脑上，通过本地 Chrome 扩展桥接你自己的 Flow 网页会话，适合个人创作、提示词测试、参考图复用和图片生产流程整理。
 
@@ -293,17 +293,7 @@ python .\flow.py upsample MEDIA_ID --resolution 2k
 - `outputs/`：生成结果、下载图片和响应 JSON。
 - `logs/`：本地 agent 日志。
 
-开源或分享项目时，不要手动压缩整个运行目录。
-
-## 公开发布打包
-
-如果你要发给别人或做公开发布包，使用：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\export_portable.ps1 -PublicRelease
-```
-
-这个模式会排除私有配置、浏览器状态、日志、生成结果、参考图文件、本地数据库和 FlowKit 运行数据库。
+开源或分享项目时，不要手动压缩整个运行目录。直接用 Git 仓库里的文件即可，`.gitignore` 已经排除了这些运行时目录。
 
 ## 安全和合规提醒
 
