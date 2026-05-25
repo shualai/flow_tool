@@ -29,7 +29,7 @@ OUTPUT_DIR = PROJECT_ROOT / "outputs"
 REFS_PATH = STATE_DIR / "refs.json"
 REF_DB_PATH = STATE_DIR / "flow_tool.sqlite"
 RUNS_PATH = STATE_DIR / "runs.jsonl"
-VENDOR_FLOWKIT = PROJECT_ROOT / "vendor" / "flowkit"
+EXTENSION_DIR = PROJECT_ROOT / "extension"
 
 
 ASPECT_RATIOS = {
@@ -80,6 +80,7 @@ def load_config() -> dict[str, Any]:
     cfg.setdefault("project_id", "")
     cfg.setdefault("user_paygate_tier", "PAYGATE_TIER_ONE")
     cfg.setdefault("aspect_ratio", "IMAGE_ASPECT_RATIO_LANDSCAPE")
+    cfg.setdefault("image_model", "NARWHAL")
     cfg.setdefault("chrome_path", "")
     cfg.setdefault("chrome_profile_dir", str(PROJECT_ROOT / "chrome-profile"))
     return cfg
@@ -379,6 +380,7 @@ class FlowApi:
         refs: list[str] | None = None,
         project_id: str | None = None,
         aspect_ratio: str | None = None,
+        image_model: str | None = None,
         user_paygate_tier: str | None = None,
         timeout: int = 480,
     ) -> dict[str, Any]:
@@ -390,6 +392,7 @@ class FlowApi:
             "project_id": project_id,
             "prompt": prompt,
             "aspect_ratio": normalize_aspect_ratio(aspect_ratio or self.config.get("aspect_ratio")),
+            "image_model": image_model or self.config.get("image_model", "NARWHAL"),
             "user_paygate_tier": user_paygate_tier or self.config.get("user_paygate_tier", "PAYGATE_TIER_ONE"),
             "count": max(1, min(int(count), 8)),
         }
@@ -735,18 +738,15 @@ class FlowApi:
         return None
 
 
-def start_agent() -> subprocess.Popen:
-    """Start bundled FlowKit agent in the background."""
-    work = VENDOR_FLOWKIT
-    if not work.exists():
-        raise FileNotFoundError(f"Bundled FlowKit not found: {work}")
+def start_bridge() -> subprocess.Popen:
+    """Start the local bridge in the background."""
     logs = PROJECT_ROOT / "logs"
     logs.mkdir(parents=True, exist_ok=True)
-    stdout = (logs / "flowkit-agent.out.log").open("ab")
-    stderr = (logs / "flowkit-agent.err.log").open("ab")
+    stdout = (logs / "flow-tool-bridge.out.log").open("ab")
+    stderr = (logs / "flow-tool-bridge.err.log").open("ab")
     return subprocess.Popen(
-        [sys.executable, "-m", "agent.main"],
-        cwd=str(work),
+        [sys.executable, "-m", "src.local_bridge"],
+        cwd=str(PROJECT_ROOT),
         stdout=stdout,
         stderr=stderr,
         creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
@@ -760,7 +760,9 @@ def open_chrome_with_extension(url: str | None = None) -> subprocess.Popen:
         raise FileNotFoundError("Chrome not found. Set chrome_path in config.json.")
     profile = Path(cfg.get("chrome_profile_dir") or PROJECT_ROOT / "chrome-profile")
     profile.mkdir(parents=True, exist_ok=True)
-    extension = VENDOR_FLOWKIT / "extension"
+    extension = EXTENSION_DIR
+    if not extension.exists():
+        raise FileNotFoundError(f"Extension not found: {extension}")
     url = url or flow_project_url(cfg.get("project_id"))
     args = [
         str(chrome),

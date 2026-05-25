@@ -13,7 +13,7 @@ from src.flow_api import (
     flow_project_url,
     open_chrome_with_extension,
     save_json,
-    start_agent,
+    start_bridge,
 )
 
 
@@ -43,8 +43,8 @@ def cmd_start(args):
     except Exception:
         pass
 
-    process = start_agent()
-    print(f"FlowKit agent started, pid={process.pid}")
+    process = start_bridge()
+    print(f"Flow Tool local bridge started, pid={process.pid}")
     if args.wait:
         api = FlowApi()
         for _ in range(30):
@@ -53,7 +53,7 @@ def cmd_start(args):
                 return
             except Exception:
                 time.sleep(1)
-        raise RuntimeError("Agent did not become ready in 30 seconds.")
+        raise RuntimeError("Bridge did not become ready in 30 seconds.")
 
 
 def cmd_open(args):
@@ -119,6 +119,7 @@ def cmd_generate(args):
         refs=refs,
         project_id=args.project_id,
         aspect_ratio=args.aspect_ratio,
+        image_model=args.model,
         user_paygate_tier=args.tier,
         timeout=args.timeout,
     )
@@ -197,15 +198,15 @@ def build_parser():
     parser = argparse.ArgumentParser(description="Local Flow API wrapper")
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p = sub.add_parser("start", help="start bundled FlowKit agent")
+    p = sub.add_parser("start", help="start local bridge")
     p.add_argument("--wait", action="store_true", help="wait until /health is ready")
     p.set_defaults(func=cmd_start)
 
-    p = sub.add_parser("open", help="open Chrome with bundled FlowKit extension")
+    p = sub.add_parser("open", help="open Chrome with the bundled extension")
     p.add_argument("--url", default=None, help="Flow page URL; defaults to configured project page")
     p.set_defaults(func=cmd_open)
 
-    p = sub.add_parser("status", help="check local agent and extension")
+    p = sub.add_parser("status", help="check local bridge and extension")
     p.set_defaults(func=cmd_status)
 
     p = sub.add_parser("credits", help="check Flow credits")
@@ -233,12 +234,13 @@ def build_parser():
     p.add_argument("--limit", type=int, default=20)
     p.set_defaults(func=cmd_runs)
 
-    p = sub.add_parser("generate", help="generate image(s) via FlowKit extension")
+    p = sub.add_parser("generate", help="generate image(s) through the extension bridge")
     p.add_argument("prompt", help="image prompt")
     p.add_argument("--count", type=int, default=1, help="number of images, 1-8")
     p.add_argument("--ref", action="append", help="reference name or media_id; repeatable")
     p.add_argument("--project-id", help="Flow project id")
     p.add_argument("--aspect-ratio", default=None, help="landscape, portrait, square, or raw Flow enum")
+    p.add_argument("--model", default=None, help="image model alias or raw Flow model id, default: nanobanana/NARWHAL")
     p.add_argument("--tier", default=None, help="PAYGATE_TIER_ONE or PAYGATE_TIER_TWO")
     p.add_argument("--timeout", type=int, default=480)
     p.add_argument("--download", action=argparse.BooleanOptionalAction, default=True)

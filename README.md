@@ -5,7 +5,7 @@
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](requirements.txt)
 [![Platform](https://img.shields.io/badge/Platform-Windows-lightgrey.svg)](USAGE.zh-CN.md)
 
-Local Google Flow / Nano Banana automation toolkit with a CLI, Python SDK, reference-image library, and real 2K/4K download workflow.
+Local Google Flow / Nano Banana / Nano Banana Pro automation toolkit with a CLI, Python SDK, reference-image library, and real 2K/4K download workflow.
 
 > Unofficial local tool for personal Flow workflows. It runs on your own machine, with your own browser session. It is not a Google product.
 
@@ -27,7 +27,7 @@ Flow API Tool wraps that workflow into a repeatable local tool:
 
 ## What You Can Build With It
 
-- Batch prompt testing for Nano Banana / Google Flow image workflows.
+- Batch prompt testing for Nano Banana Pro / Google Flow image workflows.
 - Character or product reference libraries that can be reused by name.
 - Local image generation pipelines driven by Python.
 - Repeatable 2K download workflows instead of manual browser clicking.
@@ -96,9 +96,9 @@ for item in downloaded:
 
 ## Is This an Agent?
 
-It is best described as a **local agent bridge**, not a fully autonomous AI agent.
+It is best described as a **local bridge**, not a fully autonomous AI agent.
 
-The bundled FlowKit agent runs locally and coordinates the browser extension, Flow requests, reference uploads, generation jobs, and downloads. The tool does not independently plan creative tasks like a general-purpose AI agent; it gives you programmable control over your own Google Flow session.
+The local bridge runs on your machine and coordinates the Chrome extension, Flow requests, reference uploads, generation jobs, and downloads. The tool does not independently plan creative tasks like a general-purpose AI agent; it gives you programmable control over your own Google Flow session.
 
 ## Architecture
 
@@ -109,10 +109,10 @@ CLI / Python SDK
 Local Flow API wrapper
       |
       v
-Bundled FlowKit local agent
+Flow Tool local bridge
       |
       v
-Chrome extension bridge
+Chrome extension
       |
       v
 Google Flow web session
@@ -125,7 +125,7 @@ Runtime data stays local:
 - `refs/`: local reference image files.
 - `state/`: local SQLite reference library and run state.
 - `outputs/`: generated files and response JSON.
-- `logs/`: local agent logs.
+- `logs/`: local bridge logs.
 
 These paths are ignored by git.
 
@@ -146,20 +146,68 @@ Edit `config.json`:
   "project_id": "YOUR_FLOW_PROJECT_ID",
   "user_paygate_tier": "PAYGATE_TIER_ONE",
   "aspect_ratio": "IMAGE_ASPECT_RATIO_LANDSCAPE",
+  "image_model": "NARWHAL",
   "chrome_path": "C:/Path/To/Chrome/Application/chrome.exe",
   "chrome_profile_dir": "./chrome-profile"
 }
 ```
 
+The default image model is Nano Banana (`NARWHAL`). You can also pass `--model nanobanana` on a single run. To use Nano Banana Pro, set `image_model` to `GEM_PIX_2` or pass `--model nanobananapro`.
+
 Start the bridge:
 
 ```powershell
-.\start_agent.ps1
+.\start_bridge.ps1
 .\open_flow_chrome.ps1
 python .\flow.py status
 ```
 
 When `extension_connected` and `flow_key_present` are true, the local bridge is ready.
+
+## Chrome Extension Install
+
+There are two supported ways to load the browser extension.
+
+**Option A: isolated Chrome profile**
+
+```powershell
+.\start_bridge.ps1
+.\open_flow_chrome.ps1
+```
+
+This opens a separate Chrome profile and loads the bundled extension from the repo automatically.
+
+**Option B: install manually in your own Chrome**
+
+1. Start the local bridge:
+
+```powershell
+.\start_bridge.ps1
+```
+
+2. Open Chrome and go to:
+
+```text
+chrome://extensions
+```
+
+3. Enable **Developer mode**.
+4. Click **Load unpacked**.
+5. Select the `extension` folder inside this project, for example:
+
+```text
+<your-project-folder>\extension
+```
+
+6. Open Google Flow in that same Chrome profile and sign in.
+7. Click the **Flow Tool Bridge** extension or open its side panel.
+8. Check the connection:
+
+```powershell
+python .\flow.py status
+```
+
+If you update the project files later, go back to `chrome://extensions` and click **Reload** on the Flow Tool Bridge extension.
 
 ## CLI Commands
 
@@ -216,9 +264,10 @@ python .\flow.py ref-delete character_a
 
 ```text
 flow.py                 CLI entrypoint
+src/local_bridge.py     Minimal local HTTP/WebSocket bridge
 src/flow_api.py         Python wrapper
 src/ref_store.py        Local SQLite reference library
-vendor/flowkit          Bundled FlowKit agent and extension
+extension/              Chrome extension loaded by the local bridge workflow
 config.example.json     Public config template
 USAGE.zh-CN.md          Chinese usage guide
 ```
@@ -228,7 +277,10 @@ USAGE.zh-CN.md          Chinese usage guide
 - Use this only with accounts and content you are authorized to use.
 - Review and follow Google Flow, Google Labs, Google account, and reCAPTCHA terms before using or publishing this project.
 - Do not commit cookies, browser profiles, access tokens, generated private media, uploaded references, logs, or local databases.
-- This repository vendors FlowKit, which is MIT licensed. Keep its license and attribution if you redistribute it.
+
+## Acknowledgements
+
+Thanks to [FlowKit](https://github.com/crisng95/flowkit) for the original browser-extension bridge idea and implementation references. Parts of the extension bridge are adapted from FlowKit, which is distributed under the MIT License, Copyright (c) 2026 tuannguyenhoangit-droid.
 
 ## Star This Project
 

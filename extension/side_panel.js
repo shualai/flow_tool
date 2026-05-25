@@ -1,5 +1,5 @@
 /**
- * Flow Kit — Side Panel
+ * Flow Tool Bridge - Side Panel
  * Displays live connection status, metrics, and request log.
  */
 
@@ -37,14 +37,14 @@ const TYPE_LABELS = {
 };
 
 function formatType(type) {
-  if (!type) return '—';
+  if (!type) return '-';
   return TYPE_LABELS[type] || type.slice(0, 5).toUpperCase();
 }
 
 // ── Time formatting ──────────────────────────────────────────
 
 function formatTime(iso) {
-  if (!iso) return '—';
+  if (!iso) return '-';
   try {
     const d = new Date(iso);
     const hh = String(d.getHours()).padStart(2, '0');
@@ -52,7 +52,7 @@ function formatTime(iso) {
     const ss = String(d.getSeconds()).padStart(2, '0');
     return `${hh}:${mm}:${ss}`;
   } catch {
-    return '—';
+    return '-';
   }
 }
 
@@ -63,7 +63,7 @@ function updateStatus(data) {
 
   // Connection dot
   const dot = document.getElementById('conn-dot');
-  const connected = data.agentConnected;
+  const connected = data.bridgeConnected ?? data.agentConnected;
   dot.className = connected ? 'on' : '';
 
   // Toggle state
@@ -85,14 +85,14 @@ function updateStatus(data) {
     const ageMs = data.tokenAge || 0;
     const ageMin = Math.round(ageMs / 60000);
     if (ageMs > 3600000) {
-      tokenEl.textContent = `token expired — open Flow to refresh`;
+      tokenEl.textContent = 'token expired - open Flow to refresh';
       tokenEl.className = 'warn';
     } else {
       tokenEl.textContent = `token synced ${ageMin}m`;
       tokenEl.className = 'ok';
     }
     // Auto-refresh when token age > 55 min and connected
-    if (ageMs > 3300000 && data.agentConnected) {
+    if (ageMs > 3300000 && connected) {
       chrome.runtime.sendMessage({ type: 'REFRESH_TOKEN' });
     }
   } else {
@@ -124,7 +124,7 @@ function updateRequestLog(entries) {
 
   // Render newest first (entries already sorted DESC by background.js)
   const rows = entries.map((entry) => {
-    const shortId = entry.id ? String(entry.id).slice(0, 8) : '—';
+    const shortId = entry.id ? String(entry.id).slice(0, 8) : '-';
     const type   = formatType(entry.type || entry.method);
     const time   = formatTime(entry.time || entry.timestamp || entry.createdAt);
     const status = entry.status || entry.state || 'pending';
@@ -145,7 +145,7 @@ function updateRequestLog(entries) {
 
     const errorDisplay = error
       ? `<td class="td-error" title="${escHtml(error)}">${escHtml(truncate(error, 28))}</td>`
-      : `<td class="td-error empty">—</td>`;
+      : '<td class="td-error empty">-</td>';
 
     return `<tr>
       <td class="td-id" data-request-id="${escHtml(entry.id || '')}">${escHtml(shortId)}</td>
@@ -177,7 +177,7 @@ function escHtml(str) {
 
 function truncate(str, len) {
   if (!str || str.length <= len) return str;
-  return str.slice(0, len) + '…';
+  return str.slice(0, len) + '...';
 }
 
 // ── Request detail modal ────────────────────────────────────
@@ -199,20 +199,20 @@ function showRequestDetail(reqId) {
     ['Type', formatType(entry.type || entry.method)],
     ['Time', formatTime(entry.time || entry.timestamp || entry.createdAt)],
     ['Status', entry.status || entry.state || 'pending'],
-    ['HTTP', entry.httpStatus || '—'],
-    ['URL', entry.url || '—'],
-    ['Payload', entry.payloadSummary || '—'],
-    ['Response', entry.responseSummary || '—'],
-    ['Error', entry.error || '—'],
+    ['HTTP', entry.httpStatus || '-'],
+    ['URL', entry.url || '-'],
+    ['Payload', entry.payloadSummary || '-'],
+    ['Response', entry.responseSummary || '-'],
+    ['Error', entry.error || '-'],
   ];
 
   body.innerHTML = fields.map(([label, value]) => {
     let cls = 'detail-value';
-    if (label === 'Error' && value && value !== '—') cls += ' error';
+    if (label === 'Error' && value && value !== '-') cls += ' error';
     if (label === 'Status' && (value === 'COMPLETED' || value === 'success')) cls += ' ok';
     return `<div class="detail-row">
       <div class="detail-label">${escHtml(label)}</div>
-      <div class="${cls}">${escHtml(String(value || '—'))}</div>
+      <div class="${cls}">${escHtml(String(value || '-'))}</div>
     </div>`;
   }).join('');
 

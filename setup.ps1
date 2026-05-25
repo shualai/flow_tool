@@ -18,7 +18,6 @@ if ($CreateVenv) {
 
 & $python -m pip install --upgrade pip
 & $python -m pip install -r .\requirements.txt
-& $python -m pip install -r .\vendor\flowkit\requirements.txt
 
 if (!(Test-Path ".\config.json")) {
     Copy-Item ".\config.example.json" ".\config.json"
@@ -27,5 +26,5 @@ if (!(Test-Path ".\config.json")) {
 New-Item -ItemType Directory -Force .\outputs, .\refs, .\state, .\logs | Out-Null
 
 Write-Host "Setup complete."
-Write-Host "Next: .\start_agent.ps1"
+Write-Host "Next: .\start_bridge.ps1"
 Write-Host "Then: .\open_flow_chrome.ps1"

@@ -3,6 +3,7 @@
   "project_id": "",
   "user_paygate_tier": "PAYGATE_TIER_ONE",
   "aspect_ratio": "IMAGE_ASPECT_RATIO_LANDSCAPE",
+  "image_model": "NARWHAL",
   "chrome_path": "",
   "chrome_profile_dir": "./chrome-profile"
 }

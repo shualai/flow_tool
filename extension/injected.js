@@ -1,12 +1,12 @@
 /**
- * Injected into MAIN world on labs.google — has access to window.grecaptcha
+ * Injected into MAIN world on labs.google �?has access to window.grecaptcha
  * Also intercepts TRPC fetch responses to capture fresh signed media URLs.
  */
 const SITE_KEY = '6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV';
 
 // ─── TRPC Response Monitor ─────────────────────────────────
 // Monkey-patch fetch to intercept TRPC responses containing media URLs.
-// Fresh signed GCS URLs are extracted and forwarded to the agent.
+// Fresh signed GCS URLs are extracted and forwarded to the local bridge.
 
 const _originalFetch = window.fetch;
 window.fetch = async function (...args) {

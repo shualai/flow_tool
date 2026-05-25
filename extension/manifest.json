@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Flow Kit",
+  "name": "Flow Tool Bridge",
   "version": "0.2.0",
-  "description": "Local agent bridge for Google Flow API — captures tokens, solves reCAPTCHA, proxies API calls",
+  "description": "Local bridge for Google Flow workflows",
   "permissions": ["storage", "alarms", "tabs", "webRequest", "scripting", "declarativeNetRequest", "sidePanel"],
   "host_permissions": [
     "https://labs.google/*",
@@ -42,6 +42,6 @@
   },
   "action": {
     "default_popup": "popup.html",
-    "default_title": "Flow Kit"
+    "default_title": "Flow Tool Bridge"
   }
 }

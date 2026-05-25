@@ -132,6 +132,10 @@ document.getElementById('btn-panel').addEventListener('click', () => {
   });
 });
 
+chrome.runtime.sendMessage({ type: 'STATUS' }, () => {
+  // Opening the popup should wake the MV3 service worker and reconnect to the local bridge.
+});
+
 chrome.runtime.sendMessage({ type: 'REQUEST_LOG' }, (data) => {
   if (chrome.runtime.lastError) return;
   if (data && data.log) renderLog(data.log);

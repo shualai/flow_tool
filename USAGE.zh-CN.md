@@ -1,6 +1,6 @@
 # Flow API Tool 中文指南
 
-Flow API Tool 是一个面向 Google Flow / Nano Banana 图片工作流的本地自动化工具。它把网页里反复点击的流程，整理成可以复用、可以写脚本、可以批量生成和下载的命令行工具。
+Flow API Tool 是一个面向 Google Flow / Nano Banana / Nano Banana Pro 图片工作流的本地自动化工具。它把网页里反复点击的流程，整理成可以复用、可以写脚本、可以批量生成和下载的命令行工具。
 
 它不是官方 API，也不是托管服务。它运行在你的电脑上，通过本地 Chrome 扩展桥接你自己的 Flow 网页会话，适合个人创作、提示词测试、参考图复用和图片生产流程整理。
 
@@ -63,9 +63,9 @@ Codex 可以帮你做这些事：
 
 ## 它算不算 Agent
 
-更准确地说，它是一个 **local agent bridge**。
+更准确地说，它是一个 **local bridge**。
 
-项目里包含本地 FlowKit agent，它负责协调本地服务、Chrome 扩展、Flow 网页会话、参考图上传、生成任务和高清下载。但它不是那种会自己理解目标、自动规划创作方向的全自动 AI Agent。
+项目里包含一个最小本地 bridge，它负责协调本地服务、Chrome 扩展、Flow 网页会话、参考图上传、生成任务和高清下载。但它不是那种会自己理解目标、自动规划创作方向的全自动 AI Agent。
 
 简单理解：
 
@@ -76,7 +76,7 @@ Codex 可以帮你做这些事：
 Flow API Tool
         |
         v
-本地 FlowKit agent
+本地 bridge
         |
         v
 Chrome 扩展桥接你的 Flow 网页会话
@@ -114,19 +114,22 @@ copy .\config.example.json .\config.json
   "project_id": "你的 Flow 项目 ID",
   "user_paygate_tier": "PAYGATE_TIER_ONE",
   "aspect_ratio": "IMAGE_ASPECT_RATIO_LANDSCAPE",
+  "image_model": "NARWHAL",
   "chrome_path": "你的 Chrome 路径",
   "chrome_profile_dir": "./chrome-profile"
 }
 ```
 
+默认图片生成模型是 Nano Banana，对应 Flow 内部模型名 `NARWHAL`。单次生成也可以加 `--model nanobanana`。如果你想切回 Nano Banana Pro，可以把 `image_model` 改成 `GEM_PIX_2`，或者单次生成时加 `--model nanobananapro`。
+
 `config.json` 是你的本地私有配置，里面可能包含项目 ID 和本地路径，不要提交到 GitHub。
 
 ## 启动本地桥接
 
-先启动本地 agent：
+先启动本地 bridge：
 
 ```powershell
-.\start_agent.ps1
+.\start_bridge.ps1
 ```
 
 再打开带扩展的 Chrome：
@@ -142,6 +145,63 @@ python .\flow.py status
 ```
 
 看到 `extension_connected` 和 `flow_key_present` 为 true，说明本地桥接已经可用。
+
+## 安装浏览器扩展
+
+这个项目支持两种加载扩展的方式。
+
+### 方式一：使用项目自动打开的独立 Chrome
+
+这种方式会使用项目自己的 Chrome profile，不影响你日常使用的 Chrome：
+
+```powershell
+.\start_bridge.ps1
+.\open_flow_chrome.ps1
+```
+
+打开后，在这个 Chrome 里登录 Google Flow，再运行：
+
+```powershell
+python .\flow.py status
+```
+
+### 方式二：手动安装到你自己的 Chrome
+
+如果你想用自己平时打开的 Chrome，可以手动加载扩展：
+
+1. 先启动本地 bridge：
+
+```powershell
+.\start_bridge.ps1
+```
+
+2. 在 Chrome 地址栏打开：
+
+```text
+chrome://extensions
+```
+
+3. 打开右上角的“开发者模式”。
+4. 点击“加载已解压的扩展程序”。
+5. 选择本项目里的 `extension` 文件夹，例如：
+
+```text
+<你的项目目录>\extension
+```
+
+这里不要选择整个项目目录，只选择 `extension` 这个文件夹。
+
+6. 在同一个 Chrome 里打开 Google Flow 并登录账号。
+7. 点击浏览器里的 **Flow Tool Bridge** 扩展，或者打开它的 Side Panel。
+8. 回到命令行检查：
+
+```powershell
+python .\flow.py status
+```
+
+看到 `extension_connected: true` 和 `flow_key_present: true`，说明手动安装的扩展已经和本地 bridge 连上。
+
+如果你后面更新了项目代码，需要回到 `chrome://extensions`，在 Flow Tool Bridge 卡片上点一次“重新加载”。这个步骤是 Chrome 扩展机制要求的，不是项目路径问题。
 
 ## 第一次生成图片
 
@@ -291,7 +351,7 @@ python .\flow.py upsample MEDIA_ID --resolution 2k
 - `refs/`：你放在本地的参考图文件。
 - `state/`：本地数据库、参考图映射和运行状态。
 - `outputs/`：生成结果、下载图片和响应 JSON。
-- `logs/`：本地 agent 日志。
+- `logs/`：本地 bridge 日志。
 
 开源或分享项目时，不要手动压缩整个运行目录。直接用 Git 仓库里的文件即可，`.gitignore` 已经排除了这些运行时目录。
 
@@ -330,6 +390,11 @@ python .\flow.py upsample MEDIA_ID --resolution 2k
 ### 可以跨电脑复用参考图吗
 
 可以，但需要迁移本地参考图数据库或重新上传参考图。公开仓库默认不会包含你的 `state/` 和 `refs/`，这是为了防止泄露私有素材。
+
+## 致谢
+
+- 感谢 [FlowKit](https://github.com/crisng95/flowkit) 项目提供的浏览器扩展桥接思路和实现参考。
+- 本项目中的扩展桥接部分参考并改造自 FlowKit。FlowKit 使用 MIT License，原版权归 Copyright (c) 2026 tuannguyenhoangit-droid。
 
 ## 给开源用户的一句话
 
