@@ -24,14 +24,6 @@ Flow API Tool wraps that workflow into a repeatable local tool:
 - Call the same workflow from Python scripts.
 - Keep runtime secrets, browser state, outputs, and reference files out of git.
 
-## Search Keywords
-
-`Nano Banana Pro`, `nano banana pro`, `nanobananapro`, `nanobannanpro`, `nano-banana-pro`, `Gemini 3 Pro Image`, `Google Flow`, `Google Flow API`, `Flow automation`, `Flow image generation`, `2K image download`, `4K image download`, `reference image workflow`, `image generation CLI`, `Python image generation SDK`, `Chrome extension bridge`.
-
-Suggested GitHub topics:
-
-`nano-banana-pro`, `gemini-3-pro-image`, `google-flow`, `flow-api`, `image-generation`, `ai-image`, `reference-image`, `python-cli`, `chrome-extension`, `automation`
-
 ## What You Can Build With It
 
 - Batch prompt testing for Nano Banana Pro / Google Flow image workflows.
