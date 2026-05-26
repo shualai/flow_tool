@@ -8,6 +8,7 @@ from pathlib import Path
 
 from src.flow_api import (
     FlowApi,
+    RateLimitError,
     RUNS_PATH,
     extract_media_items,
     flow_project_url,
@@ -80,6 +81,7 @@ def cmd_upload(args):
         project_id=args.project_id,
         tags=args.tag,
         note=args.note or "",
+        rate_limit_retries=args.rate_limit_retries,
     )
     print_json(result)
 
@@ -122,6 +124,7 @@ def cmd_generate(args):
         image_model=args.model,
         user_paygate_tier=args.tier,
         timeout=args.timeout,
+        rate_limit_retries=args.rate_limit_retries,
     )
     out_dir = Path(args.out_dir) if args.out_dir else None
     downloaded = []
@@ -136,6 +139,7 @@ def cmd_generate(args):
             project_id=args.project_id,
             user_paygate_tier=args.tier,
             fallback_preview=args.fallback_preview,
+            rate_limit_retries=args.rate_limit_retries,
         )
     else:
         response_path = Path(args.response_json or "last_response.json").resolve()
@@ -165,6 +169,7 @@ def cmd_download(args):
             project_id=args.project_id,
             user_paygate_tier=args.tier,
             fallback_preview=args.fallback_preview,
+            rate_limit_retries=args.rate_limit_retries,
         )
     else:
         if not args.media_id:
@@ -190,6 +195,7 @@ def cmd_upsample(args):
         quality=args.resolution,
         project_id=args.project_id,
         user_paygate_tier=args.tier,
+        rate_limit_retries=args.rate_limit_retries,
     )
     print_json({"downloaded": downloaded_as_json(downloaded)})
 
@@ -218,6 +224,7 @@ def build_parser():
     p.add_argument("--project-id", help="Flow project id")
     p.add_argument("--tag", action="append", help="reference tag; repeatable")
     p.add_argument("--note", help="free-form note for this reference")
+    p.add_argument("--rate-limit-retries", type=int, default=None, help="override 429 retry count for this command")
     p.set_defaults(func=cmd_upload)
 
     p = sub.add_parser("refs", help="list saved reference image media_ids")
@@ -243,6 +250,7 @@ def build_parser():
     p.add_argument("--model", default=None, help="image model alias or raw Flow model id, default: nanobanana/NARWHAL")
     p.add_argument("--tier", default=None, help="PAYGATE_TIER_ONE or PAYGATE_TIER_TWO")
     p.add_argument("--timeout", type=int, default=480)
+    p.add_argument("--rate-limit-retries", type=int, default=None, help="override 429 retry count for this command")
     p.add_argument("--download", action=argparse.BooleanOptionalAction, default=True)
     p.add_argument("--quality", choices=["preview", "2k", "4k"], default="2k", help="download quality; 2k/4k use Flow upsampleImage")
     p.add_argument("--fallback-preview", action="store_true", help="if 2k/4k upsample fails, save the preview image instead")
@@ -265,6 +273,7 @@ def build_parser():
     p.add_argument("--tier", default=None, help="PAYGATE_TIER_ONE or PAYGATE_TIER_TWO")
     p.add_argument("--no-media-api", action="store_true", help="do not try /api/flow/media fallback for response.json downloads")
     p.add_argument("--prefer-media-api", action="store_true", help="try /api/flow/media before the response fifeUrl")
+    p.add_argument("--rate-limit-retries", type=int, default=None, help="override 429 retry count for this command")
     p.set_defaults(func=cmd_download)
 
     p = sub.add_parser("upsample", help="download media_id values through Flow's 2K/4K image upsample")
@@ -274,6 +283,7 @@ def build_parser():
     p.add_argument("--tier", default=None, help="PAYGATE_TIER_ONE or PAYGATE_TIER_TWO")
     p.add_argument("--out-dir", help="download output directory")
     p.add_argument("--prefix", help="output filename prefix")
+    p.add_argument("--rate-limit-retries", type=int, default=None, help="override 429 retry count for this command")
     p.set_defaults(func=cmd_upsample)
 
     return parser
@@ -282,7 +292,17 @@ def build_parser():
 def main(argv=None):
     parser = build_parser()
     args = parser.parse_args(argv)
-    args.func(args)
+    try:
+        args.func(args)
+    except RateLimitError as exc:
+        print_json(
+            {
+                "error": "RATE_LIMITED",
+                "message": str(exc),
+                "retry_after_seconds": exc.retry_after,
+            }
+        )
+        raise SystemExit(2)
 
 
 if __name__ == "__main__":

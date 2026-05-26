@@ -192,6 +192,16 @@ class UpsampleImageRequest(BaseModel):
 
 def unwrap_or_raise(result: dict[str, Any]) -> dict[str, Any]:
     status = result.get("status", 200)
+    retry_after = result.get("retryAfter")
+    headers = {"Retry-After": str(int(retry_after))} if status == 429 and retry_after is not None else None
+    if status == 429:
+        detail = {
+            "error": "RATE_LIMITED",
+            "message": "Flow returned HTTP 429. Slow down and retry after the suggested delay.",
+            "retry_after": retry_after,
+            "data": result.get("data") or result.get("error"),
+        }
+        raise HTTPException(status_code=429, detail=detail, headers=headers)
     if result.get("error"):
         raise HTTPException(status if isinstance(status, int) and status >= 400 else 502, result["error"])
     if isinstance(status, int) and status >= 400:

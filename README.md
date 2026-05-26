@@ -147,6 +147,9 @@ Edit `config.json`:
   "user_paygate_tier": "PAYGATE_TIER_ONE",
   "aspect_ratio": "IMAGE_ASPECT_RATIO_LANDSCAPE",
   "image_model": "NARWHAL",
+  "rate_limit_max_retries": 3,
+  "rate_limit_initial_delay": 10,
+  "rate_limit_max_delay": 120,
   "chrome_path": "C:/Path/To/Chrome/Application/chrome.exe",
   "chrome_profile_dir": "./chrome-profile"
 }
@@ -230,6 +233,28 @@ python .\flow.py generate "product render" --download --fallback-preview
 ```
 
 The default high-resolution path uses Flow's upsample workflow. If 2K/4K download fails, the tool does not silently save a preview image as if it were high resolution unless `--fallback-preview` is set.
+
+## Handling HTTP 429
+
+HTTP 429 means Google Flow is rate limiting the current browser/account/session. This tool does not try to bypass that. It slows down and retries with exponential backoff, using Flow's `Retry-After` header when one is returned.
+
+Default retry settings live in `config.json`:
+
+```json
+{
+  "rate_limit_max_retries": 3,
+  "rate_limit_initial_delay": 10,
+  "rate_limit_max_delay": 120
+}
+```
+
+For a single command, override the retry count:
+
+```powershell
+python .\flow.py generate "your prompt" --rate-limit-retries 5
+```
+
+If 429 continues after retries, wait several minutes, reduce `--count`, avoid parallel runs from the same account, and let the Flow page/session cool down before trying again.
 
 ## Reference Image Library
 

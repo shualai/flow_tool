@@ -40,6 +40,15 @@ function _classifyApiUrl(url) {
   return 'API';
 }
 
+function _retryAfterSeconds(value) {
+  if (!value) return null;
+  const seconds = Number(value);
+  if (Number.isFinite(seconds)) return Math.max(0, seconds);
+  const timestamp = Date.parse(value);
+  if (Number.isFinite(timestamp)) return Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
+  return null;
+}
+
 // ─── Request Log ────────────────────────────────────────────
 
 let requestLog = [];
@@ -496,6 +505,7 @@ async function handleApiRequest(msg) {
       id,
       status: response.status,
       data: responseData,
+      retryAfter: _retryAfterSeconds(response.headers.get('Retry-After')),
     });
 
     const responseSummary = responseText ? responseText.slice(0, 300) : null;
@@ -504,7 +514,8 @@ async function handleApiRequest(msg) {
       updateRequestLog(logId, { status: 'success', httpStatus: response.status, responseSummary });
     } else {
       if (hasCaptcha) { metrics.failedCount++; metrics.lastError = `API_${response.status}`; }
-      updateRequestLog(logId, { status: 'failed', error: `API_${response.status}`, httpStatus: response.status, responseSummary });
+      const errorLabel = response.status === 429 ? 'RATE_LIMITED' : `API_${response.status}`;
+      updateRequestLog(logId, { status: 'failed', error: errorLabel, httpStatus: response.status, responseSummary });
     }
   } catch (e) {
     sendToBridge({
@@ -586,17 +597,27 @@ async function handlePageApiRequest(msg) {
         return {
           status: response.status,
           data: responseData,
+          retryAfter: (() => {
+            const value = response.headers.get('Retry-After');
+            if (!value) return null;
+            const seconds = Number(value);
+            if (Number.isFinite(seconds)) return Math.max(0, seconds);
+            const timestamp = Date.parse(value);
+            if (Number.isFinite(timestamp)) return Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
+            return null;
+          })(),
           responseSummary: responseText ? responseText.slice(0, 300) : null,
         };
       },
       args: [{ url, method, headers, body, flowKey: activeFlowKey }],
     });
 
-    sendToBridge({ id, status: result.status, data: result.data });
+    sendToBridge({ id, status: result.status, data: result.data, retryAfter: result.retryAfter });
     if (result.status >= 200 && result.status < 300) {
       updateRequestLog(logId, { status: 'success', httpStatus: result.status, responseSummary: result.responseSummary });
     } else {
-      updateRequestLog(logId, { status: 'failed', error: `API_${result.status}`, httpStatus: result.status, responseSummary: result.responseSummary });
+      const errorLabel = result.status === 429 ? 'RATE_LIMITED' : `API_${result.status}`;
+      updateRequestLog(logId, { status: 'failed', error: errorLabel, httpStatus: result.status, responseSummary: result.responseSummary });
     }
   } catch (e) {
     sendToBridge({ id, status: 500, error: e.message || 'PAGE_API_REQUEST_FAILED' });

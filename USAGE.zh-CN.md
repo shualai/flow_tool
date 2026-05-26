@@ -115,6 +115,9 @@ copy .\config.example.json .\config.json
   "user_paygate_tier": "PAYGATE_TIER_ONE",
   "aspect_ratio": "IMAGE_ASPECT_RATIO_LANDSCAPE",
   "image_model": "NARWHAL",
+  "rate_limit_max_retries": 3,
+  "rate_limit_initial_delay": 10,
+  "rate_limit_max_delay": 120,
   "chrome_path": "你的 Chrome 路径",
   "chrome_profile_dir": "./chrome-profile"
 }
@@ -234,6 +237,28 @@ python .\flow.py generate "futuristic city skyline, cinematic lighting" --downlo
 ```powershell
 python .\flow.py generate "product render" --download --fallback-preview
 ```
+
+## 遇到 429 限流怎么办
+
+429 代表 Google Flow 对当前浏览器、账号或会话做了频率限制。这个项目不会尝试绕过限制，而是自动慢下来：优先读取 Flow 返回的 `Retry-After`，如果没有这个头，就用指数退避等待后重试。
+
+默认配置在 `config.json` 里：
+
+```json
+{
+  "rate_limit_max_retries": 3,
+  "rate_limit_initial_delay": 10,
+  "rate_limit_max_delay": 120
+}
+```
+
+单次命令可以临时覆盖重试次数：
+
+```powershell
+python .\flow.py generate "your prompt" --rate-limit-retries 5
+```
+
+如果重试后仍然 429，建议先停几分钟，降低 `--count`，不要同时开多个生成任务，也不要多个脚本共用同一个账号连续请求。429 本质上是平台让你降速，最稳的处理方式就是等待和减少并发。
 
 ## 参考图资产库
 
@@ -378,6 +403,10 @@ python .\flow.py upsample MEDIA_ID --resolution 2k
 ### 生成时报 reCAPTCHA 或 unusual activity
 
 先暂停请求，不要连续重试。重新登录 Flow，降低生成频率。如果还是失败，换网络或等待一段时间再试。
+
+### 生成或下载时报 429
+
+这是限流。工具会自动重试；如果最后仍失败，说明当前账号或会话还在冷却期。等几分钟再跑，或者降低一次生成数量。
 
 ### 2K/4K 下载失败
 

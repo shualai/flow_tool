@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import base64
+import email.utils
 import json
 import mimetypes
 import os
+import random
 import re
 import shutil
 import subprocess
@@ -48,6 +50,14 @@ UPSAMPLE_RESOLUTIONS = {
 DOWNLOAD_QUALITIES = {"preview", "2k", "4k"}
 
 
+class RateLimitError(RuntimeError):
+    """Raised after Flow keeps returning HTTP 429 beyond the retry budget."""
+
+    def __init__(self, message: str, retry_after: float | None = None):
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
 def now_stamp() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S")
 
@@ -81,9 +91,31 @@ def load_config() -> dict[str, Any]:
     cfg.setdefault("user_paygate_tier", "PAYGATE_TIER_ONE")
     cfg.setdefault("aspect_ratio", "IMAGE_ASPECT_RATIO_LANDSCAPE")
     cfg.setdefault("image_model", "NARWHAL")
+    cfg.setdefault("rate_limit_max_retries", 3)
+    cfg.setdefault("rate_limit_initial_delay", 10)
+    cfg.setdefault("rate_limit_max_delay", 120)
     cfg.setdefault("chrome_path", "")
     cfg.setdefault("chrome_profile_dir", str(PROJECT_ROOT / "chrome-profile"))
     return cfg
+
+
+def parse_retry_after(value: str | int | float | None) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        return max(0.0, float(value))
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return max(0.0, float(text))
+    except ValueError:
+        pass
+    try:
+        parsed = email.utils.parsedate_to_datetime(text)
+        return max(0.0, parsed.timestamp() - time.time())
+    except (TypeError, ValueError, IndexError):
+        return None
 
 
 def append_run(record: dict[str, Any]) -> None:
@@ -278,6 +310,73 @@ class FlowApi:
         self.session = requests.Session()
         self.refs = RefStore(REF_DB_PATH, REFS_PATH)
 
+    def _rate_limit_max_retries(self) -> int:
+        return max(0, int(self.config.get("rate_limit_max_retries", 3)))
+
+    def _rate_limit_delay(self, attempt: int, retry_after: float | None) -> float:
+        if retry_after is not None:
+            delay = retry_after
+        else:
+            initial = max(1.0, float(self.config.get("rate_limit_initial_delay", 10)))
+            delay = initial * (2 ** attempt)
+        max_delay = max(1.0, float(self.config.get("rate_limit_max_delay", 120)))
+        delay = min(delay, max_delay)
+        return delay + random.uniform(0, min(1.5, delay * 0.1))
+
+    @staticmethod
+    def _response_json_or_text(response: requests.Response) -> Any:
+        try:
+            return response.json()
+        except ValueError:
+            return response.text[:500]
+
+    @staticmethod
+    def _response_retry_after(response: requests.Response) -> float | None:
+        retry_after = parse_retry_after(response.headers.get("Retry-After"))
+        if retry_after is not None:
+            return retry_after
+        try:
+            payload = response.json()
+        except ValueError:
+            return None
+        detail = payload.get("detail", payload) if isinstance(payload, dict) else payload
+        if isinstance(detail, dict):
+            for key in ("retry_after", "retryAfter", "retry_after_seconds", "retryAfterSeconds"):
+                retry_after = parse_retry_after(detail.get(key))
+                if retry_after is not None:
+                    return retry_after
+        return None
+
+    def _request_json(
+        self,
+        method: str,
+        path: str,
+        *,
+        json_body: dict[str, Any] | None = None,
+        timeout: int | float = 60,
+        rate_limit_retries: int | None = None,
+    ) -> dict[str, Any]:
+        retries = self._rate_limit_max_retries() if rate_limit_retries is None else max(0, int(rate_limit_retries))
+        url = f"{self.base_url}{path}"
+        for attempt in range(retries + 1):
+            response = self.session.request(method, url, json=json_body, timeout=timeout)
+            if response.status_code != 429:
+                response.raise_for_status()
+                data = self._response_json_or_text(response)
+                return data if isinstance(data, dict) else {"data": data}
+
+            retry_after = self._response_retry_after(response)
+            if attempt < retries:
+                time.sleep(self._rate_limit_delay(attempt, retry_after))
+                continue
+
+            detail = self._response_json_or_text(response)
+            wait_hint = f" Retry after about {retry_after:.0f}s." if retry_after is not None else ""
+            raise RateLimitError(
+                f"Flow returned HTTP 429 after {retries + 1} attempt(s).{wait_hint} Detail: {detail}",
+                retry_after=retry_after,
+            )
+
     def health(self) -> dict[str, Any]:
         return self.session.get(f"{self.base_url}/health", timeout=20).json()
 
@@ -285,9 +384,7 @@ class FlowApi:
         return self.session.get(f"{self.base_url}/api/flow/status", timeout=20).json()
 
     def credits(self) -> dict[str, Any]:
-        response = self.session.get(f"{self.base_url}/api/flow/credits", timeout=30)
-        response.raise_for_status()
-        return response.json()
+        return self._request_json("GET", "/api/flow/credits", timeout=30)
 
     def upload_reference(
         self,
@@ -296,6 +393,7 @@ class FlowApi:
         project_id: str | None = None,
         tags: list[str] | None = None,
         note: str = "",
+        rate_limit_retries: int | None = None,
     ) -> dict[str, Any]:
         src = Path(file_path).expanduser().resolve()
         if not src.exists():
@@ -304,17 +402,17 @@ class FlowApi:
         if not project_id:
             raise ValueError("project_id is required. Set it in config.json or pass project_id.")
 
-        response = self.session.post(
-            f"{self.base_url}/api/flow/upload-image",
-            json={
+        result = self._request_json(
+            "POST",
+            "/api/flow/upload-image",
+            json_body={
                 "file_path": str(src),
                 "project_id": project_id,
                 "file_name": src.name,
             },
             timeout=180,
+            rate_limit_retries=rate_limit_retries,
         )
-        response.raise_for_status()
-        result = response.json()
         media_id = result.get("media_id")
         if not media_id:
             raise RuntimeError(f"Upload succeeded but no media_id was returned: {result}")
@@ -383,6 +481,7 @@ class FlowApi:
         image_model: str | None = None,
         user_paygate_tier: str | None = None,
         timeout: int = 480,
+        rate_limit_retries: int | None = None,
     ) -> dict[str, Any]:
         project_id = project_id or self.config.get("project_id")
         if not project_id:
@@ -400,13 +499,13 @@ class FlowApi:
         if ref_ids:
             payload["character_media_ids"] = ref_ids
 
-        response = self.session.post(
-            f"{self.base_url}/api/flow/generate-image",
-            json=payload,
+        data = self._request_json(
+            "POST",
+            "/api/flow/generate-image",
+            json_body=payload,
             timeout=timeout,
+            rate_limit_retries=rate_limit_retries,
         )
-        response.raise_for_status()
-        data = response.json()
         append_run(
             {
                 "time": datetime.now().isoformat(timespec="seconds"),
@@ -425,6 +524,7 @@ class FlowApi:
         target_resolution: str | None = "2k",
         user_paygate_tier: str | None = None,
         timeout: int = 360,
+        rate_limit_retries: int | None = None,
     ) -> dict[str, Any]:
         if not media_id:
             raise ValueError("media_id is required")
@@ -434,13 +534,13 @@ class FlowApi:
             "target_resolution": normalize_upsample_resolution(target_resolution),
             "user_paygate_tier": user_paygate_tier or self.config.get("user_paygate_tier", "PAYGATE_TIER_ONE"),
         }
-        response = self.session.post(
-            f"{self.base_url}/api/flow/upsample-image",
-            json=payload,
+        data = self._request_json(
+            "POST",
+            "/api/flow/upsample-image",
+            json_body=payload,
             timeout=timeout,
+            rate_limit_retries=rate_limit_retries,
         )
-        response.raise_for_status()
-        data = response.json()
         append_run(
             {
                 "time": datetime.now().isoformat(timespec="seconds"),
@@ -471,6 +571,7 @@ class FlowApi:
         project_id: str | None = None,
         user_paygate_tier: str | None = None,
         index: int = 1,
+        rate_limit_retries: int | None = None,
     ) -> DownloadedImage:
         out_path = Path(out_dir) if out_dir else OUTPUT_DIR / f"upsample-{now_stamp()}"
         out_path.mkdir(parents=True, exist_ok=True)
@@ -482,6 +583,7 @@ class FlowApi:
             project_id=project_id,
             target_resolution=quality,
             user_paygate_tier=user_paygate_tier,
+            rate_limit_retries=rate_limit_retries,
         )
         save_json(out_path / f"{prefix}-{index:02d}-{safe_media_id}-upsample-response.json", response_data)
         content, source = self._download_from_upsample_response(response_data)
@@ -512,6 +614,7 @@ class FlowApi:
         project_id: str | None = None,
         user_paygate_tier: str | None = None,
         fallback_preview: bool = False,
+        rate_limit_retries: int | None = None,
     ) -> list[DownloadedImage]:
         out_path = Path(out_dir) if out_dir else OUTPUT_DIR / now_stamp()
         out_path.mkdir(parents=True, exist_ok=True)
@@ -538,6 +641,7 @@ class FlowApi:
                         project_id=project_id,
                         user_paygate_tier=user_paygate_tier,
                         index=index,
+                        rate_limit_retries=rate_limit_retries,
                     )
                     downloaded.append(upsampled)
                     continue
@@ -551,7 +655,7 @@ class FlowApi:
                         continue
 
             if prefer_media_api and try_media_api:
-                content = self._download_via_media_api(media_id)
+                content = self._download_via_media_api(media_id, rate_limit_retries=rate_limit_retries)
                 source = "media_api"
 
             if content is None and url:
@@ -559,7 +663,7 @@ class FlowApi:
                 source = "fifeUrl"
 
             if content is None and try_media_api:
-                content = self._download_via_media_api(media_id)
+                content = self._download_via_media_api(media_id, rate_limit_retries=rate_limit_retries)
                 source = "media_api"
 
             if content is None:
@@ -616,6 +720,7 @@ class FlowApi:
         project_id: str | None = None,
         user_paygate_tier: str | None = None,
         fallback_preview: bool = False,
+        rate_limit_retries: int | None = None,
     ) -> list[DownloadedImage]:
         out_path = Path(out_dir) if out_dir else OUTPUT_DIR / f"media-{now_stamp()}"
         out_path.mkdir(parents=True, exist_ok=True)
@@ -636,6 +741,7 @@ class FlowApi:
                             project_id=project_id,
                             user_paygate_tier=user_paygate_tier,
                             index=index,
+                            rate_limit_retries=rate_limit_retries,
                         )
                     )
                     continue
@@ -649,7 +755,7 @@ class FlowApi:
                         )
                         continue
 
-            content = self._download_via_media_api(media_id)
+            content = self._download_via_media_api(media_id, rate_limit_retries=rate_limit_retries)
             if content is None:
                 errors.append(
                     {
@@ -707,14 +813,18 @@ class FlowApi:
             time.sleep(1.5 * attempt)
         return None
 
-    def _download_via_media_api(self, media_id: str) -> bytes | None:
+    def _download_via_media_api(self, media_id: str, rate_limit_retries: int | None = None) -> bytes | None:
         if not media_id:
             return None
         try:
-            response = self.session.get(f"{self.base_url}/api/flow/media/{media_id}", timeout=120)
-            if not response.ok:
-                return None
-            data = response.json()
+            data = self._request_json(
+                "GET",
+                f"/api/flow/media/{media_id}",
+                timeout=120,
+                rate_limit_retries=rate_limit_retries,
+            )
+        except RateLimitError:
+            raise
         except Exception:
             return None
 
